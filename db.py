@@ -1,0 +1,1 @@
+# This is the file that contains all the database logic of the project
