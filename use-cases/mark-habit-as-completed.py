@@ -1,1 +1,0 @@
-# Here's the code to mark a habit as completed.

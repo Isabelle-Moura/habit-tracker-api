@@ -1,1 +1,0 @@
-# Here's the code to register a user.

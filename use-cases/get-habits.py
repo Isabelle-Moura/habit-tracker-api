@@ -1,1 +1,0 @@
-# Here's the code to get all the habits of a user.
