@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from use_cases.create_habit import create_habit
-from use_cases.get_habits import get_habits
+from use_cases.get_habits import get_habits, get_habit_stats
 from use_cases.mark_habit_as_completed import mark_habit_as_completed
 from use_cases.user_register import register_user
 from use_cases.user_login import login_user
@@ -10,7 +10,11 @@ import jwt
 print("Iniciando o app.py...")
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}})
+CORS(app, resources={r"/*": {
+    "origins": "http://localhost:3000",
+    "allow_headers": ["Content-Type", "Authorization"],
+    "methods": ["GET", "POST", "OPTIONS"]
+}})
 
 print("Flask e CORS configurados.")
 
@@ -73,21 +77,35 @@ def create_habit_endpoint(current_user_id):
     data = request.get_json()
     name = data.get("name")
     frequency = data.get("frequency")
+    category = data.get("category", "Uncategorized")  # Categoria opcional
     
     if not all([name, frequency]):
         return jsonify({"error": "Missing required fields"}), 400
     
-    habit_id = create_habit(current_user_id, name, frequency)
+    habit_id = create_habit(current_user_id, name, frequency, category)
     return jsonify({"habit_id": habit_id}), 201
 
-# Novo endpoint para buscar os hábitos do usuário autenticado
-@app.route("/habits", methods=["GET"])
+@app.route("/habits/category/<category>", methods=["GET"])
 @token_required
-def get_habits_endpoint(current_user_id):
-    habits = get_habits(current_user_id)
+def get_habits_by_category_endpoint(current_user_id, category):
+    habits = get_habits_by_category(current_user_id, category)
     for habit in habits:
         habit["_id"] = str(habit["_id"])
     return jsonify(habits), 200
+
+@app.route("/habits", methods=["GET"])
+@token_required
+def get_habits_endpoint(current_user_id):
+    habits = get_habits(current_user_id)  # Passe o user_id
+    for habit in habits:
+        habit["_id"] = str(habit["_id"])
+    return jsonify(habits), 200
+
+@app.route("/habits/stats", methods=["GET"])
+@token_required
+def get_habit_stats_endpoint(current_user_id):
+    stats = get_habit_stats(current_user_id)
+    return jsonify(stats), 200
 
 @app.route("/habits/<habit_id>/complete", methods=["POST"])
 @token_required

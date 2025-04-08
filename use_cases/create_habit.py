@@ -3,7 +3,14 @@
 from db import habits_collection
 from models import Habit
 
-def create_habit(user_id, name, frequency):
-    habit = Habit(user_id, name, frequency)
-    result = habits_collection.insert_one(habit.to_dict())
-    return str(result.inserted_id)  # Retorna o ID do hábito criado
+def create_habit(user_id, name, frequency, category="Uncategorized"):
+    habit = {
+        "user_id": user_id,
+        "name": name,
+        "frequency": frequency,
+        "category": category,  # Novo campo
+        "completed_dates": [],
+        "created_at": datetime.now()
+    }
+    result = habits_collection.insert_one(habit)
+    return str(result.inserted_id)
