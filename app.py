@@ -5,6 +5,7 @@ from use_cases.get_habits import get_habits, get_habit_stats
 from use_cases.mark_habit_as_completed import mark_habit_as_completed
 from use_cases.user_register import register_user
 from use_cases.user_login import login_user
+from use_cases.get_dashboard_data import get_dashboard_data
 import jwt
 
 print("Iniciando o app.py...")
@@ -100,6 +101,15 @@ def get_habits_endpoint(current_user_id):
     for habit in habits:
         habit["_id"] = str(habit["_id"])
     return jsonify(habits), 200
+
+@app.route("/dashboard", methods=["GET"])
+@token_required
+def get_dashboard_data_endpoint(current_user_id):
+    data = get_dashboard_data(current_user_id)
+    # Converte ObjectId para string
+    for habit in data["habits"]:
+        habit["_id"] = str(habit["_id"])
+    return jsonify(data), 200
 
 @app.route("/habits/stats", methods=["GET"])
 @token_required
