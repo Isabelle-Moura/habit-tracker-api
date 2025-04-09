@@ -1,44 +1,60 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from use_cases.create_habit import create_habit
-from use_cases.get_habits import get_habits, get_habit_stats
-from use_cases.mark_habit_as_completed import mark_habit_as_completed
-from use_cases.user_register import register_user
-from use_cases.user_login import login_user
-from use_cases.get_dashboard_data import get_dashboard_data
+from use_cases import (
+    create_habit,
+    get_habits,
+    get_habits_by_category,
+    mark_habit_as_completed,
+    register_user,
+    login_user,
+    get_dashboard_data
+)
 import jwt
+from dotenv import load_dotenv
+import os
+from enums.log_messages import LogMessage
+from enums.error_messages import ErrorMessage
 
-print("Iniciando o app.py...")
+load_dotenv()
+
+print(LogMessage.STARTING_APP.value)
+
+cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
+cors_allow_headers = os.getenv("CORS_ALLOW_HEADERS", "Content-Type,Authorization").split(",")
+cors_methods = os.getenv("CORS_METHODS", "GET,POST,OPTIONS").split(",")
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {
-    "origins": "http://localhost:3000",
-    "allow_headers": ["Content-Type", "Authorization"],
-    "methods": ["GET", "POST", "OPTIONS"]
-}})
 
-print("Flask e CORS configurados.")
+CORS(app, resources={
+    r"/*": {
+        "origins": cors_origins,
+        "allow_headers": cors_allow_headers,
+        "methods": cors_methods
+    }
+})
 
-SECRET_KEY = "segredin"  # Deve ser a mesma chave usada no user_login.py
+print(LogMessage.FLASK_CORS_CONFIGURED.value)
 
-# Middleware para verificar o token JWT
+SECRET_KEY = os.getenv("SECRET_KEY")
+
+# JWT verification's middleware
 def token_required(f):
     def wrapper(*args, **kwargs):
         token = request.headers.get("Authorization")
         if not token:
-            return jsonify({"error": "Token is missing"}), 401
+            return jsonify({"error": ErrorMessage.TOKEN_MISSING.value}), 401
         
         try:
-            token = token.replace("Bearer ", "")  # Remove o prefixo "Bearer "
+            token = token.replace("Bearer ", "")
             data = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
             current_user_id = data["user_id"]
         except jwt.ExpiredSignatureError:
-            return jsonify({"error": "Token has expired"}), 401
+            return jsonify({"error": ErrorMessage.TOKEN_EXPIRED.value}), 401
         except jwt.InvalidTokenError:
-            return jsonify({"error": "Invalid token"}), 401
+            return jsonify({"error": ErrorMessage.INVALID_TOKEN.value}), 401
         
         return f(current_user_id, *args, **kwargs)
-    wrapper.__name__ = f.__name__  # Necessário para evitar erros com Flask
+    wrapper.__name__ = f.__name__
     return wrapper
 
 @app.route("/register", methods=["POST"])
@@ -49,7 +65,7 @@ def register_endpoint():
     password = data.get("password")
     
     if not all([username, email, password]):
-        return jsonify({"error": "Missing required fields"}), 400
+        return jsonify({"error": ErrorMessage.MISSING_FIELDS.value}), 400
     
     try:
         user_id = register_user(username, email, password)
@@ -64,7 +80,7 @@ def login_endpoint():
     password = data.get("password")
     
     if not all([email, password]):
-        return jsonify({"error": "Missing required fields"}), 400
+        return jsonify({"error": ErrorMessage.MISSING_FIELDS.value}), 400
     
     try:
         token = login_user(email, password)
@@ -78,10 +94,10 @@ def create_habit_endpoint(current_user_id):
     data = request.get_json()
     name = data.get("name")
     frequency = data.get("frequency")
-    category = data.get("category", "Uncategorized")  # Categoria opcional
+    category = data.get("category", "Uncategorized")
     
     if not all([name, frequency]):
-        return jsonify({"error": "Missing required fields"}), 400
+        return jsonify({"error": ErrorMessage.MISSING_FIELDS.value}), 400
     
     habit_id = create_habit(current_user_id, name, frequency, category)
     return jsonify({"habit_id": habit_id}), 201
@@ -97,7 +113,7 @@ def get_habits_by_category_endpoint(current_user_id, category):
 @app.route("/habits", methods=["GET"])
 @token_required
 def get_habits_endpoint(current_user_id):
-    habits = get_habits(current_user_id)  # Passe o user_id
+    habits = get_habits(current_user_id)
     for habit in habits:
         habit["_id"] = str(habit["_id"])
     return jsonify(habits), 200
@@ -106,16 +122,9 @@ def get_habits_endpoint(current_user_id):
 @token_required
 def get_dashboard_data_endpoint(current_user_id):
     data = get_dashboard_data(current_user_id)
-    # Converte ObjectId para string
     for habit in data["habits"]:
         habit["_id"] = str(habit["_id"])
     return jsonify(data), 200
-
-@app.route("/habits/stats", methods=["GET"])
-@token_required
-def get_habit_stats_endpoint(current_user_id):
-    stats = get_habit_stats(current_user_id)
-    return jsonify(stats), 200
 
 @app.route("/habits/<habit_id>/complete", methods=["POST"])
 @token_required
@@ -123,9 +132,10 @@ def mark_habit_as_completed_endpoint(current_user_id, habit_id):
     success = mark_habit_as_completed(habit_id, current_user_id)
     if success:
         return jsonify({"message": "Habit marked as completed"}), 200
-    return jsonify({"error": "Habit not found or unauthorized"}), 404
+    return jsonify({"error": ErrorMessage.HABIT_NOT_FOUND_OR_UNAUTHORIZED.value}), 404
 
 if __name__ == "__main__":
-    print("Iniciando o servidor Flask...")
-    app.run(debug=True)
-    print("Servidor Flask iniciado.")
+    print(LogMessage.STARTING_SERVER.value)
+    port = int(os.getenv("FLASK_PORT", 5000))
+    app.run(debug=os.getenv("FLASK_ENV") == "development", port=port)
+    print(LogMessage.SERVER_STARTED.value)

@@ -8,7 +8,7 @@ def create_habit(user_id, name, frequency, category="Uncategorized"):
         "user_id": user_id,
         "name": name,
         "frequency": frequency,
-        "category": category,  # Novo campo
+        "category": category,  
         "completed_dates": [],
         "created_at": datetime.now()
     }

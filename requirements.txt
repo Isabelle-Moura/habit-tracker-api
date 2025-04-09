@@ -4,3 +4,4 @@ dnspython
 bcrypt
 pyjwt
 flask-cors
+python-dotenv
