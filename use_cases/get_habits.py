@@ -1,7 +1,7 @@
 from db import habits_collection
 from models import Habit
 from utils.response_builder import build_response
-from enum.success_messages import SuccessMessages
+from enums.success_messages import SuccessMessage
 
 def get_habits(user_id, page=1, limit=10):
     skip = (page - 1) * limit
@@ -10,7 +10,7 @@ def get_habits(user_id, page=1, limit=10):
     total_count = habits_collection.count_documents({"user_id": user_id})
     
     return build_response(
-        message=SuccessMessages.GET_HABITS.value,
+        message=SuccessMessage.GET_HABITS.value,
         status="success",
         data=habits_list,
         page=page,

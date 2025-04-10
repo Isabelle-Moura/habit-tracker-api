@@ -7,5 +7,6 @@ class SuccessMessage(Enum):
     HABIT_DELETED = "Habit deleted successfully"
     HABIT_COMPLETED = "Habit completed successfully"
     GET_DASH_DATA = "Dashboard data retrieved successfully"
+    LOGIN_SUCCESSFUL = "Login effected uccessfully"
     GET_HABITS = "Habits retrieved successfully" 
     GET_HABITS_BY_CATEGORY = "Habits retrieved successfully in the following category: "
