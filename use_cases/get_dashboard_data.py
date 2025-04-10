@@ -1,24 +1,31 @@
 from db import habits_collection
+from models import Habit
 from datetime import datetime, timedelta
+from utils.response_builder import build_response
+from enums.success_messages import SuccessMessage
 
 def get_dashboard_data(user_id):
     habits = habits_collection.find({"user_id": user_id})
-    habits_list = [habit for habit in habits]
+    habits_list = [Habit.from_dict(habit) for habit in habits]
     
     if not habits_list:
-        return {
-            "pending_habits": [],
-            "completion_rate": 0,
-            "total_habits": 0,
-            "total_completions": 0,
-            "longest_streak": 0,
-            "best_habit": None,
-            "category_performance": {},
-            "weekly_progress": [],
-            "avg_completion_time": 0,
-            "suggested_habit": None,
-            "habits": []
-        }
+        return build_response(
+            message="No habits found",
+            status="success",
+            data={
+                "pending_habits": [],
+                "completion_rate": 0,
+                "total_habits": 0,
+                "total_completions": 0,
+                "longest_streak": 0,
+                "best_habit": None,
+                "category_performance": {},
+                "weekly_progress": [],
+                "avg_completion_time": 0,
+                "suggested_habit": None,
+                "habits": []
+            }
+        )
 
     today = datetime.now().date()
     total_habits = len(habits_list)
@@ -27,23 +34,20 @@ def get_dashboard_data(user_id):
     longest_streak = 0
     category_counts = {}
     category_completions = {}
-    weekly_progress = [0] * 7  # Last 7 days
+    weekly_progress = [0] * 7
 
     for habit in habits_list:
-        completed_dates = [d.date() for d in habit.get("completed_dates", [])]
+        completed_dates = [d.date() for d in habit.completed_dates]
         total_completions += len(completed_dates)
         
-        # Pending Habits (with optional category)
-        category = habit.get("category", "Uncategorized")  # Uses "Uncategorized" if no category is provided
         is_pending = False
-        if habit["frequency"] == "daily" and today not in completed_dates:
+        if habit.frequency == "daily" and today not in completed_dates:
             is_pending = True
-        elif habit["frequency"] == "weekly" and not any(d >= today - timedelta(days=7) for d in completed_dates):
+        elif habit.frequency == "weekly" and not any(d >= today - timedelta(days=7) for d in completed_dates):
             is_pending = True
         if is_pending:
-            pending_habits.append({"name": habit["name"], "category": category})
+            pending_habits.append({"name": habit.name, "category": habit.category})
 
-        # Streak (days in a row)
         sorted_dates = sorted(completed_dates)
         current_streak = 0
         max_streak = 0
@@ -57,49 +61,44 @@ def get_dashboard_data(user_id):
             max_streak = max(max_streak, current_streak)
         longest_streak = max(longest_streak, max_streak)
 
-        # Category Counts
+        category = habit.category
         category_counts[category] = category_counts.get(category, 0) + 1
         category_completions[category] = category_completions.get(category, 0) + len(completed_dates)
 
-        # Weekly Progress
         for date in completed_dates:
             days_ago = (today - date).days
             if 0 <= days_ago < 7:
                 weekly_progress[6 - days_ago] += 1
 
-    # Completion Rate
-    total_possible = sum((datetime.now() - h.get("created_at", datetime.now())).days + 1 if h["frequency"] == "daily" else ((datetime.now() - h.get("created_at", datetime.now())).days + 1) // 7 for h in habits_list)
+    total_possible = sum((datetime.now() - h.created_at).days + 1 if h.frequency == "daily" else ((datetime.now() - h.created_at).days + 1) // 7 for h in habits_list)
     completion_rate = (total_completions / total_possible * 100) if total_possible > 0 else 0
 
-    # Best Habit (based on completions)
     best_habit = None
     best_score = 0
     suggested_habit = None
     worst_score = 100
     for habit in habits_list:
-        completions = len(habit.get("completed_dates", []))
-        days_since_creation = (datetime.now() - habit.get("created_at", datetime.now())).days + 1
-        possible = days_since_creation if habit["frequency"] == "daily" else days_since_creation // 7
+        completions = len(habit.completed_dates)
+        days_since_creation = (datetime.now() - habit.created_at).days + 1
+        possible = days_since_creation if habit.frequency == "daily" else days_since_creation // 7
         score = (completions / possible * 100) if possible > 0 else 0
-        stars = min(5, max(1, int(score / 20)))  # 1 to 5 stars
-        habit["stars"] = stars
+        stars = min(5, max(1, int(score / 20)))
+        habit.stars = stars
         if score > best_score:
             best_score = score
-            best_habit = {"name": habit["name"], "stars": stars}
+            best_habit = {"name": habit.name, "stars": stars}
         if score < worst_score:
             worst_score = score
-            suggested_habit = habit["name"]
+            suggested_habit = habit.name
 
-    # Category Performance
     category_performance = {
         cat: (category_completions.get(cat, 0) / (category_counts[cat] * total_possible / total_habits) * 100) if cat in category_counts else 0
         for cat in category_counts
     }
 
-    # Conclusion Average Time
     avg_completion_time = total_completions / total_habits if total_habits > 0 else 0
 
-    return {
+    dashboard_data = {
         "pending_habits": pending_habits,
         "completion_rate": completion_rate,
         "total_habits": total_habits,
@@ -110,5 +109,11 @@ def get_dashboard_data(user_id):
         "weekly_progress": weekly_progress,
         "avg_completion_time": avg_completion_time,
         "suggested_habit": suggested_habit,
-        "habits": habits_list
+        "habits": [h.to_dict() for h in habits_list]
     }
+
+    return build_response(
+        message=SuccessMessage.GET_DASH_DATA.value,
+        status="success",
+        data=dashboard_data
+    )

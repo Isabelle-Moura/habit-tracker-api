@@ -1,16 +1,26 @@
-# Here's the code to register a user.
-
 from db import users_collection
 from models import User
 import bcrypt
+from enums.error_messages import ErrorMessage
+from enums.success_messages import SuccessMessage
+from utils.response_builder import build_response
 
 def register_user(username, email, password):
-    # Verify if user's e-mail is already taken
     if users_collection.find_one({"email": email}):
-        raise ValueError("Email already in use")
+        return build_response(
+            message=ErrorMessage.EMAIL_ALREADY_REGISTERED.value,
+            status="error"
+        )
 
-    # Hash password
     hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
-    user = User(username, email, hashed_password.decode("utf-8"))
+    
+    user = User(username=username, email=email, password=hashed_password.decode("utf-8"))
+    
     result = users_collection.insert_one(user.to_dict())
-    return str(result.inserted_id)
+    user_id = str(result.inserted_id)
+    
+    return build_response(
+        message=SuccessMessage.USER_REGISTERED.value,
+        status="success",
+        data={"user_id": user_id}
+    )
